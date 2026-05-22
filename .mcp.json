@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "okx-trade-mcp-live": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@okx_ai/okx-trade-mcp",
+        "--profile",
+        "live",
+        "--modules",
+        "all"
+      ]
+    }
+  }
+}

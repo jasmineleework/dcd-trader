@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- DCD weekly report — 每周日 20:00 触发 -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.CHANGE_ME.dcd-weekly-report</string>
+
+    <key>Program</key>
+    <string>/Users/CHANGE_ME/path/to/dcd-trader/shell/run_weekly_report.sh</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- 每周日 20:00 触发（Weekday=0 表示周日） -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>0</integer>
+        <key>Hour</key>
+        <integer>20</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DCD_WORK_DIR</key>
+        <string>/Users/CHANGE_ME/.dcd-trader</string>
+        <key>DCD_PLUGIN_DIR</key>
+        <string>/Users/CHANGE_ME/.claude/plugins/dcd-trader</string>
+        <key>PATH</key>
+        <string>/Users/CHANGE_ME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/CHANGE_ME/.dcd-trader/logs/launchd_weekly.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/CHANGE_ME/.dcd-trader/logs/launchd_weekly.stderr.log</string>
+</dict>
+</plist>

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- DCD 8h idle scan — 每 8 小时触发，但 run_8h_idle_scan.sh 会先检查 flag 文件，无 flag 直接 exit 0 -->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.CHANGE_ME.dcd-8h-idle-scan</string>
+
+    <key>Program</key>
+    <string>/Users/CHANGE_ME/path/to/dcd-trader/shell/run_8h_idle_scan.sh</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- 每天 00:13 / 08:13 触发（与主 cron 16:03 错开） -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>0</integer>
+            <key>Minute</key>
+            <integer>13</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>8</integer>
+            <key>Minute</key>
+            <integer>13</integer>
+        </dict>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DCD_WORK_DIR</key>
+        <string>/Users/CHANGE_ME/.dcd-trader</string>
+        <key>DCD_PLUGIN_DIR</key>
+        <string>/Users/CHANGE_ME/.claude/plugins/dcd-trader</string>
+        <key>PATH</key>
+        <string>/Users/CHANGE_ME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/CHANGE_ME/.dcd-trader/logs/launchd_idle_scan.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/CHANGE_ME/.dcd-trader/logs/launchd_idle_scan.stderr.log</string>
+</dict>
+</plist>

@@ -1,0 +1,35 @@
+# Personal runtime data (never commit)
+data/ledger.json
+交易记录.md
+经验复盘.md
+last_run_report.md
+last_weekly_report.md
+logs/
+.idle_scan_enabled
+*.html
+
+# Local secrets / env
+.env
+.env.*
+!templates/.env.example
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code local overrides
+.claude/settings.local.json
+CLAUDE.md

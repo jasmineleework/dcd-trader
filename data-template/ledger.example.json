@@ -1,0 +1,14 @@
+{
+  "meta": {
+    "schema_version": "1.0",
+    "strategy_version": "v3",
+    "strategy_v3_effective_date": "",
+    "p0_v3_usd": 0,
+    "v3_first_seq": 0,
+    "last_updated": null,
+    "notes": "由 /dcd-trader:dcd-setup 初始化。填写 strategy_v3_effective_date（YYYY-MM-DD）和 p0_v3_usd（v3 起算日的账户总资产 USD 等值，新用户填 0）。"
+  },
+  "injections": [],
+  "orders": [],
+  "snapshots": []
+}

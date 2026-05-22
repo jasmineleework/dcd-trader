@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  DCD daily trade — launchd 模板
+  使用方法：
+    1. 把本文件复制到 ~/Library/LaunchAgents/com.<your-name>.dcd-daily-trade.plist
+    2. 修改下方 <CHANGE_ME> 占位符（Label、Program 路径、DCD_WORK_DIR 等）
+    3. launchctl load ~/Library/LaunchAgents/com.<your-name>.dcd-daily-trade.plist
+    4. 测试：launchctl start com.<your-name>.dcd-daily-trade
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.CHANGE_ME.dcd-daily-trade</string>
+
+    <key>Program</key>
+    <string>/Users/CHANGE_ME/path/to/dcd-trader/shell/run_dcd_cron.sh</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <!-- 每天 16:03 本地时间触发 -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>16</integer>
+        <key>Minute</key>
+        <integer>3</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>DCD_WORK_DIR</key>
+        <string>/Users/CHANGE_ME/.dcd-trader</string>
+        <key>DCD_PLUGIN_DIR</key>
+        <string>/Users/CHANGE_ME/.claude/plugins/dcd-trader</string>
+        <key>PATH</key>
+        <string>/Users/CHANGE_ME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/CHANGE_ME/.dcd-trader/logs/launchd_daily.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/CHANGE_ME/.dcd-trader/logs/launchd_daily.stderr.log</string>
+</dict>
+</plist>

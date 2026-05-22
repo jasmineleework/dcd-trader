@@ -1,0 +1,9 @@
+{
+  "name": "dcd-trader",
+  "version": "0.1.0",
+  "description": "OKX DCD (Dual-Currency Deposit / 双币赢) automated trading plugin for Claude Code — PUT + CALL dual-line strategy with auto-settlement, weekly reports, and 8h idle-fund scanning.",
+  "author": "jasmineleework",
+  "homepage": "https://github.com/jasmineleework/dcd-trader",
+  "repository": "https://github.com/jasmineleework/dcd-trader",
+  "license": "MIT"
+}
