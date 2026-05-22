@@ -54,11 +54,8 @@ claude --plugin-dir ./dcd-trader
 
 ## 首次配置
 
-1. **配置 OKX API key**（live profile）：
-
-   ```bash
-   npx -y @okx_ai/okx-trade-mcp setup --profile live
-   ```
+1. **授权 OKX MCP**：在 Claude Code 里运行 `/mcp`，选择 `okx-trade-mcp-live`，浏览器完成 OKX OAuth 登录。
+   （若选用本地 STDIO 方式，见下方"OKX MCP"章节）
 
 2. **初始化工作目录**：
 
@@ -132,21 +129,34 @@ claude --plugin-dir ./dcd-trader
 | `DCD_TIMEOUT_SEC` | `1200` | 主 cron 硬超时 |
 | `TELEGRAM_ENV` | `~/.claude/channels/telegram/.env` | Telegram 配置文件 |
 
-## OKX MCP — 本地 vs 远程
+## OKX MCP
 
-当前 `.mcp.json` 使用本地 STDIO server：
-
-```json
-"command": "npx",
-"args": ["-y", "@okx_ai/okx-trade-mcp", "--profile", "live", "--modules", "all"]
-```
-
-OKX 官方[宣布](https://github.com/okx/agent-trade-kit) cloud-hosted MCP "coming soon"。上线后切换为：
+`.mcp.json` 使用 OKX 官方托管的 remote MCP（OAuth 认证）：
 
 ```json
-"url": "https://mcp.okx.com/agent-trade-kit",
-"headers": { "Authorization": "Bearer ${OKX_MCP_TOKEN}" }
+{
+  "mcpServers": {
+    "okx-trade-mcp-live": {
+      "url": "https://www.okx.com/api/v1/mcp/trading-oauth"
+    }
+  }
+}
 ```
+
+**首次连接 OAuth 授权**：
+
+1. 在 Claude Code 里运行 `/mcp`，选 `okx-trade-mcp-live`
+2. Claude Code 会打开浏览器跳转到 OKX 登录页，授权后自动回传 token
+3. 之后所有调用都自动带 OAuth header
+
+> 若你想用本地 STDIO server（不走 OAuth、用本地 OKX API key），把 `.mcp.json` 改为：
+> ```json
+> { "mcpServers": { "okx-trade-mcp-live": {
+>     "command": "npx",
+>     "args": ["-y", "@okx_ai/okx-trade-mcp", "--profile", "live", "--modules", "all"]
+> } } }
+> ```
+> 然后 `npx -y @okx_ai/okx-trade-mcp setup --profile live` 配置 API key。
 
 ## 贡献
 
