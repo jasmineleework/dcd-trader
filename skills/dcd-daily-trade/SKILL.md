@@ -20,7 +20,7 @@ allowed-tools: Bash, Read, Write, Edit, WebSearch, mcp__okx-trade-mcp-live__*
 1. 调用 `dcd_get_orders`（live）查询最近订单，找到所有已结算（state=settled）但尚未写入交易记录的订单（对比 `交易记录.md` 中的订单 ID）
 2. 对每笔已结算订单：
    - 记录结算价、结果（行权/未行权）、收到金额、权利金
-   - **PUT 被行权**：计算收到的 BTC 数量，并入合并池，重新计算合并有效成本
+   - **PUT 被行权**：计算收到的 BTC 数量，并入合并池，重新计算合并有效成本；**在「合并有效成本」区块的 BTC 池构成表追加一行**（并入日 = 今日、投入USDG = 该 PUT 的 deposit、BTC量），供 CLOSE 档算 T_eff
    - **PUT 未行权**：记录 USDG/USDT 收益
    - **CALL 被行权**：BTC 已卖出换回 USDG，记录回收金额，清空 BTC 合并池
    - **CALL 未行权**：权利金 BTC 并入合并池，更新合并有效成本（公式：总投入USDG ÷ 总持有BTC）
@@ -96,8 +96,13 @@ allowed-tools: Bash, Read, Write, Edit, WebSearch, mcp__okx-trade-mcp-live__*
 - `one_sigma_1d = vol_24h`（v3 引擎返回的 1 天预测波动率）
 
 **CLOSE 档**（`gap_pct <= one_sigma_1d`，含 BTC 高于回本）：
-- 目标：保本行权
-- strike_suggestion = `ceil(breakeven / 500) × 500`
+- 目标：保本退出 **+ 闭环达标 10% 年化**（收回 USDG >= 最初投入 USDG ×(1+10%/365×T_eff)）
+- 先算 `T_eff`（投入加权平均持有天数）：
+  - 从当前 BTC 池各批的（并入日、投入USDG）按投入加权：`T_eff = Σ(各批投入USDG × 各批持有天数) / Σ各批投入USDG`
+  - 单批时 `T_eff = 今天 − 该批 BTC 并入日`（= 对应 PUT 被行权日）
+  - 各批数据从「合并有效成本」区块的 BTC 池构成表读（单批见交易记录激活点；多批见构成表）
+- `K_target = breakeven ×(1 + 0.10/365 × T_eff)`
+- strike_suggestion = `ceil(K_target / 500) × 500`
 - 选最接近且 >= strike_suggestion 的可用产品
 
 **FAR 档**（`gap_pct > one_sigma_1d`，BTC 远低于回本）：
@@ -107,17 +112,19 @@ allowed-tools: Bash, Read, Write, Edit, WebSearch, mcp__okx-trade-mcp-live__*
 - strike_suggestion = `ceil(upper_bound / 500) × 500 + 500`
 - 选最接近且 >= strike_suggestion 的可用产品
 - **接受尾部风险**：strike 低于 breakeven，意外行权时小幅亏损卖出
+- **FAR 档不受 10% 年化约束**：不打算这轮退出，只攒权利金降本；意外行权那一轮不保证达标，属可接受尾部风险
 
 通用：
 - BTC >= 0.0001 时执行，全仓（向下取整 0.0001）
 - 优先 1 天产品，比较 USDG/USDT 选 APY 高的
 - `dcd_subscribe`（**不传 minAnnualizedYield**，notionalCcy: BTC）
-- 下单前用 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/calc_volatility.py --mode sell --breakeven <X>` 辅助计算 strike_suggestion
+- 下单前用 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/calc_volatility.py --mode sell --breakeven <X> --hold-days <T_eff>` 辅助计算 strike_suggestion（CLOSE 档必传 `--hold-days`；年化目标改用 `--min-annual-yield`，默认 0.10）
 
 **Step 4：记录**
 - 新订单写入 `$DCD_WORK_DIR/交易记录.md`，格式与历史记录一致
 - **APY 字段**：写入 `quote.annualizedYield × 100`（真实百分比）
 - **CALL 订单**：记录 tier（CLOSE/FAR）、gap_pct、strike_suggestion vs 实际选中 strike
+  - **CLOSE 档额外记录**：T_eff（持有天数）、K_target（含年化目标价）、implied_apy（= (strike/breakeven−1)×365/T_eff，核对 >= 10%）
 - 更新汇总表、当前资产快照
 - 如跳过某策略，记录跳过原因
 
