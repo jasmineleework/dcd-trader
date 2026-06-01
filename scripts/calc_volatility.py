@@ -208,6 +208,8 @@ def calc_sell_strike(
     min_dist: float,
     breakeven: float,
     expiry_days: int = 1,
+    hold_days: float = 0.0,
+    min_annual_yield: float = 0.10,
 ) -> dict:
     """
     CALL 策略：分级行权价选择（高卖）
@@ -222,16 +224,20 @@ def calc_sell_strike(
         upper_bound = price × (1 + sell_dist)
         strike = ceil(upper_bound / 500) × 500 + 500   # 向上取整 + $500 缓冲
         风险：strike < breakeven，意外行权时小幅亏损卖出
+        注：FAR 档不受 10% 年化下限约束（不打算这轮退出，意外行权属可接受尾部风险）
 
     - CLOSE (gap_pct <= one_sigma_1d)：
-        BTC 接近或高于回本，目标保本行权
-        strike = ceil(breakeven / 500) × 500   # 回本价向上取整到 500
+        BTC 接近或高于回本，目标保本退出，且保证闭环 10% 年化收益
+        k_target = breakeven × (1 + min_annual_yield / 365 × hold_days)
+        strike = ceil(k_target / 500) × 500   # 含年化目标价向上取整到 500
+        其中 hold_days = T_eff（投入加权平均持有天数），由调用方传入
     """
     gap_pct = (breakeven - price) / price if price > 0 else 0
     one_sigma_1d = vol_24h
     raw_dist = vol_24h * math.sqrt(expiry_days) * event_mult
     sell_dist = max(raw_dist, min_dist)
     upper_bound = price * (1 + sell_dist)
+    k_target = breakeven * (1 + min_annual_yield / 365 * hold_days)
 
     if gap_pct > one_sigma_1d:
         tier = "far"
@@ -240,16 +246,24 @@ def calc_sell_strike(
             f"BTC 距回本 {gap_pct*100:.2f}% > 1σ_1D {one_sigma_1d*100:.2f}%，"
             f"挂波动上界 ${upper_bound:.0f} 向上取整+$500 缓冲，"
             f"strike ${strike} < breakeven ${breakeven:.0f}，最大化 APY 降本"
+            f"（FAR 档不保 10% 年化，意外行权属可接受尾部风险）"
         )
     else:
         tier = "close"
-        strike = int(math.ceil(breakeven / 500)) * 500
+        strike = int(math.ceil(k_target / 500)) * 500
         rationale = (
             f"BTC 距回本 {gap_pct*100:.2f}% <= 1σ_1D {one_sigma_1d*100:.2f}%，"
-            f"挂回本 ${breakeven:.0f} 向上取整到 ${strike}，目标保本行权"
+            f"挂含 {min_annual_yield*100:.0f}% 年化目标价 ${k_target:.0f}"
+            f"（回本 ${breakeven:.0f} × 持有 {hold_days:.1f} 天）向上取整到 ${strike}，"
+            f"目标保本退出 + 闭环达标年化"
         )
 
     actual_dist = (strike - price) / price if price > 0 else 0
+    implied_apy = (
+        (strike / breakeven - 1) * 365 / hold_days
+        if (breakeven > 0 and hold_days > 0)
+        else None
+    )
 
     return {
         "tier": tier,
@@ -258,8 +272,12 @@ def calc_sell_strike(
         "sell_dist": round(sell_dist, 6),
         "upper_bound": round(upper_bound, 2),
         "breakeven": round(breakeven, 2),
+        "hold_days": round(hold_days, 2),
+        "min_annual_yield": min_annual_yield,
+        "k_target": round(k_target, 2),
         "strike_suggestion": strike,
         "actual_dist": round(actual_dist, 6),
+        "implied_apy": round(implied_apy, 6) if implied_apy is not None else None,
         "rationale": rationale,
     }
 
@@ -306,6 +324,8 @@ def main():
     parser.add_argument("--near-event", action="store_true", help="临近事件日")
     parser.add_argument("--mode", choices=["buy", "sell"], default="buy", help="buy=PUT, sell=CALL 分级")
     parser.add_argument("--breakeven", type=float, help="CALL 合并有效成本（sell 模式必填）")
+    parser.add_argument("--hold-days", type=float, default=0.0, help="T_eff 投入加权平均持有天数（sell CLOSE 档必填）")
+    parser.add_argument("--min-annual-yield", type=float, default=0.10, help="闭环最低年化目标（默认 0.10=10%）")
 
     args = parser.parse_args()
 
@@ -335,6 +355,8 @@ def main():
             min_dist=args.min_dist,
             breakeven=args.breakeven,
             expiry_days=args.expiry_days,
+            hold_days=args.hold_days,
+            min_annual_yield=args.min_annual_yield,
         )
     else:
         strike_result = calc_strike_and_dist(
