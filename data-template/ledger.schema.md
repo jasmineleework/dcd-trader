@@ -99,12 +99,13 @@ PnL_btc_v3            = Σ orders[seq>=12].pnl_usd_eq where pnl_category in (btc
   "ts": "2026-05-17T18:47:00+08:00",     // 写入时刻
   "usdg_funding": 0.67,
   "usdt_funding": 0.20,
+  "usdt_savings": 0,                       // 简单赚币里的 USDT（活期）；已含入 total_assets_usd_eq；USDG 不支持赚币无此项。无赚币时填 0
   "btc_balance": 0.0000063,
   "btc_price_usd": 78135,                // 写入时刻 BTC 现价
   "open_positions_usdg": 18108,          // 在仓 USDG 锁定合计
   "open_positions_usdt": 2047,           // 在仓 USDT 锁定合计
   "merged_cost_basis_usd": 68135,        // BTC 合并有效成本（最新值），无 BTC 持仓时 null
-  "total_assets_usd_eq": 20156,          // 当时总资产 USD 等值
+  "total_assets_usd_eq": 20156,          // 当时总资产 USD 等值（含 usdt_savings）
   "note": "可选"
 }
 ```

@@ -43,6 +43,17 @@
 - 连续被行权 2 次后暂停 1 天
 - 1D 和 2D 均不满足安全距离时，尝试 3D-5D 产品（不轻易跳过）
 
+### 闲置资金停泊（USDT 简单赚币）
+
+> 无合规 DCD 产品时（如 vol 高企 / 事件窗口），闲置 USDT 不应 0 收益干等，停泊进简单赚币（活期）吃利息。
+
+- **仅 USDT**：USDG **不支持**简单赚币（OKX `58003`），无合规产品时只能闲置等待
+- **可用资金口径**：评估 USDT PUT 时，`USDT 可用 = 资金账户 USDT + 简单赚币 USDT`（活期可即时赎回）
+- **有合规 DCD 产品 → 优先 DCD**：从赚币赎回所需 USDT 投 DCD。DCD PUT APY 门槛 >= 5% 恒 >> 赚币 lendingRate（~1.55%），永远优先 DCD；赎回后须重查余额确认到账再下单，未到账则本轮跳过该 USDT PUT（不报错，留在赚币下轮再试）
+- **无合规产品 → 停泊**：资金账户闲置 USDT >= 100 时 `earn_savings_purchase`（rate 默认 0.01 最大化匹配），< 100 零头不动
+- **记账**：赚币 USDT 计入总资产（日 cron 快照新增 `usdt_savings` 字段，`total_assets_usd_eq` 含此项）；8h 扫描 flag 把赚币 USDT 计入"待部署"
+- 工具：`earn_get_savings_balance` / `earn_savings_purchase` / `earn_savings_redeem` / `earn_get_lending_rate_history`
+
 ### 波动率预测（v3）
 
 > **完整算法实现**：`calc_volatility.py`（唯一代码来源，含 CLI 和可导入函数）

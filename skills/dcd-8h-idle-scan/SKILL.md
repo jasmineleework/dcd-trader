@@ -23,14 +23,15 @@ allowed-tools: Bash, Read, Write, Edit, WebSearch, mcp__okx-trade-mcp-live__*
 ```bash
 # 拉余额
 account_get_asset_balance (USDG, USDT, BTC)
+earn_get_savings_balance (USDT)   # 简单赚币里的 USDT，计入可用
 ```
 
 判断三类闲置：
-- USDG_funding >= 1000 → 候选 PUT-USDG
-- USDT_funding >= 1000 → 候选 PUT-USDT
+- USDG_funding >= 1000 → 候选 PUT-USDG（USDG 不支持简单赚币）
+- (USDT_funding + USDT_savings) >= 1000 → 候选 PUT-USDT（赚币活期可即时赎回）
 - BTC_funding   >= 0.0001 → 候选 CALL-BTC
 
-**全部 < 阈值**（即 USDG/USDT < 100、BTC < 0.0001）→ 执行"停用 flag"：
+**全部 < 阈值**（USDG < 100、USDT 资金账户+赚币 < 1000、BTC < 0.0001）→ 执行"停用 flag"：
 ```bash
 rm -f "$DCD_WORK_DIR/.idle_scan_enabled"
 ```
@@ -49,8 +50,8 @@ rm -f "$DCD_WORK_DIR/.idle_scan_enabled"
 - 优先 1D，1D 不合规试 2D-5D
 - 按 USDG 池"3–5 份轮动"规则切分投入；USDT 池 < 3000 时全仓
 
-**合规 → 立即 `dcd_subscribe`** 部署闲置份额。
-**不合规** → 跳过本轮，记录扫描时点与判断理由，等下次 8h 扫描。
+**合规 → 立即 `dcd_subscribe`** 部署闲置份额（USDT 投入 > 资金账户余额时，先 `earn_savings_redeem` 赎回缺口并重查余额确认到账，再下单；未到账则本轮跳过该 USDT PUT 不报错）。
+**不合规** → 跳过本轮，记录扫描时点与判断理由，等下次 8h 扫描；**USDT 无合规品时把资金账户闲置 USDT（>= 100）`earn_savings_purchase` 停泊进简单赚币吃利息**（USDG 不支持，维持闲置）。
 
 ### Phase 5：记录 + flag 启停
 
@@ -60,8 +61,8 @@ rm -f "$DCD_WORK_DIR/.idle_scan_enabled"
 2. 若下单，同步写 `data/ledger.json`（参考 `dcd-daily-trade` Phase 3 Step 4.5）
 3. 写当日快照到 ledger（参考 Step 4.6）
 4. 重新评估 flag：
-   - 部署后仍有 USDG/USDT >= 1000 或 BTC >= 0.0001 → 保留 flag
-   - 已全部部署完毕 → `rm -f "$DCD_WORK_DIR/.idle_scan_enabled"` 停用扫描
+   - 部署后仍有 USDG >= 1000 或 (USDT 资金账户 + 赚币) >= 1000 或 BTC >= 0.0001 → 保留 flag（USDT 停在赚币里不算已部署）
+   - 已全部进 DCD 仓 → `rm -f "$DCD_WORK_DIR/.idle_scan_enabled"` 停用扫描
 
 ### Phase 6：生成报告
 
