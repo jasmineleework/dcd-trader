@@ -38,7 +38,9 @@ Read $DCD_WORK_DIR/data/ledger.json
 Read $DCD_WORK_DIR/last_run_report.md
 ```
 
-从"📈 当前资产快照"段提取：USDG 资金账户、USDT 资金账户、BTC 余额、在仓 USDG 合计、在仓 USDT 合计。
+从"📈 当前资产快照"段提取：USDG 资金账户、USDT 资金账户、**USDT 简单赚币**、BTC 余额、在仓 USDG 合计、在仓 USDT 合计。
+
+> 报告"USDT: X（资金账户）+ Y（简单赚币）"两段都要取；若用 ledger 快照交叉验证，读 `usdt_savings` 字段。USDG 无赚币（不支持）。
 
 #### 1.3 BTC 实时价
 
@@ -77,9 +79,11 @@ P_v3 = Σ amount
 
 ```
 V_now = USDG_funding + USDG_在仓
-      + USDT_funding + USDT_在仓
+      + USDT_funding + USDT_savings + USDT_在仓
       + BTC_余额 × BTC_现价
 ```
+
+> `USDT_savings` = 简单赚币里的 USDT（稳定币 1:1 计 USD 等值）。漏算会让总资产凭空缩水、年化失真。
 
 #### C. v3 累积净收益（含分类）
 
@@ -149,7 +153,7 @@ v3 累积年化 = ROR_v3 × 365 / T_days_v3
 
 - v3 累积投入：**P_v3 USD 等值**（P_0_v3 @ d_0_v3 + 各笔注资）
 - 当前总资产：**V_now USDG 等值**
-  - 资金账户：USDG XX / USDT XX / BTC X.XXXX（@ $XX,XXX）
+  - 资金账户：USDG XX / USDT XX（+ 简单赚币 XX）/ BTC X.XXXX（@ $XX,XXX）
   - 在仓锁定：USDG X,XXX + USDT X,XXX
 - v3 累积净收益：**+/-XXX USDG（+/-X.XX%）**
   - 策略已实现（稳定币口径，ledger 精确）：+/-XXX USDG

@@ -51,8 +51,12 @@ allowed-tools: Bash, Read, Write, Edit, WebSearch, mcp__okx-trade-mcp-live__*
 - `market_get_funding_rate`（BTC-USD-SWAP）→ 资金费率
 - `dcd_get_products`（BTC, USDG, P）+ `dcd_get_products`（BTC, USDT, P）→ PUT 产品
 - `dcd_get_products`（BTC, USDG, C）+ `dcd_get_products`（BTC, USDT, C）→ CALL 产品
-- `account_get_asset_balance`（USDG,USDT,BTC）→ 余额
+- `account_get_asset_balance`（USDG,USDT,BTC）→ 资金账户余额
+- `earn_get_savings_balance`（USDT）→ 简单赚币里的 USDT（字段 `amt`=总持有），计入 USDT 可用资金
+- `earn_get_lending_rate_history`（USDT, limit:1）→ 当前赚币实际收益率（字段 `lendingRate`，仅供记录参考）
 - WebSearch → 近期事件日历（FOMC/CPI/NFP/CME）
+
+> **赚币说明**：USDG **不支持**简单赚币（OKX 58003），无合规产品时只能闲置。仅 **USDT** 可停泊赚币。
 
 **Step 2：计算波动率 + 安全下界**
 - 调 `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/calc_volatility.py --price X --iv-annual X --atr-fast X --atr-slow X --bb-upper X --bb-lower X --funding-rate X --high-30d X --price-7d-ago X --event-mult X --min-dist X`
@@ -70,6 +74,7 @@ allowed-tools: Bash, Read, Write, Edit, WebSearch, mcp__okx-trade-mcp-live__*
 
 **Step 3a：确认可用资金**
 - 查 `account_get_asset_balance`（USDG, USDT）
+- **USDT 可用 = 资金账户 USDT + 简单赚币 USDT（`earn_get_savings_balance` 的 `amt`，活期可即时赎回）**
 - 只对**今天有到期结算或闲置**的资金下单（已在仓的资金不动）
 - 资金账户无 USDG/USDT 时，从交易账户划转：`account_transfer`（from:18, to:6）
 
@@ -88,6 +93,20 @@ allowed-tools: Bash, Read, Write, Edit, WebSearch, mcp__okx-trade-mcp-live__*
 - 投入按 USDG 池"3–5 份轮动"规则切分（详见 `DCD策略.md`）；USDT 池 < 3000 时全仓单仓滚动
 - `dcd_subscribe`（**不传 minAnnualizedYield**，notionalCcy: 实际持有币种）
 - 硬性约束：安全距离 >= min_dist，行权价 < 安全下界
+
+**Step 3d：USDT 简单赚币停泊 / 赎回**（仅 USDT；USDG 不支持赚币，跳过此步）
+
+判断本轮 USDT 是否选到了合规 PUT 产品（Step 3c 的结果）：
+
+- **选到了合规 USDT PUT 产品** → 若投入金额 > 资金账户现有 USDT，先从赚币赎回差额再下单：
+  1. `redeem_amt = ceil(投入金额 − 资金账户USDT)`（只赎回缺口；DCD APY≥5% 恒 >> 赚币 1.55%，永远优先 DCD）
+  2. `earn_savings_redeem`（ccy:USDT, amt:redeem_amt）
+  3. **重新查 `account_get_asset_balance`（USDT）确认到账**（活期通常即时；若未到账则本轮跳过该 USDT PUT，不报错，USDT 留在赚币，下轮再试）
+  4. 到账后再 `dcd_subscribe`
+- **没选到合规 USDT PUT 产品**（跳过 PUT）→ 把资金账户闲置 USDT 停泊进赚币吃利息：
+  - 资金账户 USDT **>= 100** → `earn_savings_purchase`（ccy:USDT, amt:资金账户USDT 全额, 不传 rate 用默认 0.01 最大化匹配）
+  - < 100（零头）→ 不操作
+- 记录本步动作（赎回 X / 停泊 X / 维持）写入 Step 4
 
 策略 B（CALL，分级选品）：
 
@@ -151,8 +170,10 @@ echo '<JSON 字符串>' | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger_append.py
 **Step 4.6：写入当日快照到 ledger**
 
 ```bash
-echo '{"ts":"<ISO8601>","usdg_funding":<X>,"usdt_funding":<X>,"btc_balance":<X>,"btc_price_usd":<X>,"open_positions_usdg":<X>,"open_positions_usdt":<X>,"total_assets_usd_eq":<X>}' | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger_append.py snapshot
+echo '{"ts":"<ISO8601>","usdg_funding":<X>,"usdt_funding":<X>,"usdt_savings":<X>,"btc_balance":<X>,"btc_price_usd":<X>,"open_positions_usdg":<X>,"open_positions_usdt":<X>,"total_assets_usd_eq":<X>}' | python3 ${CLAUDE_PLUGIN_ROOT}/scripts/ledger_append.py snapshot
 ```
+
+> `usdt_savings` = `earn_get_savings_balance` 的 `amt`。**`total_assets_usd_eq` 必须包含 `usdt_savings`**（赚币里的 USDT 仍是我们的资产，漏算会导致周报总资产凭空缩水、年化算错）。
 
 ### Phase 4：8h 闲置扫描启停控制
 
@@ -160,11 +181,12 @@ echo '{"ts":"<ISO8601>","usdg_funding":<X>,"usdt_funding":<X>,"btc_balance":<X>,
 
 **8h 闲置扫描启停**（flag 文件 `$DCD_WORK_DIR/.idle_scan_enabled`）：
 
-- 检查资金账户当前余额（部署后剩余值，不算在仓）：
-  - 若 **USDG >= 1000** 或 **USDT >= 1000** 或 **BTC >= 0.0001** → 仍有闲置 →
+- 检查当前余额（部署后剩余值，不算在仓）：
+  - 若 **USDG >= 1000** 或 **(USDT 资金账户 + USDT 赚币) >= 1000** 或 **BTC >= 0.0001** → 仍有待部署资金 →
     `touch "$DCD_WORK_DIR/.idle_scan_enabled"` （启用扫描）
   - 否则（全是零头）→
     `rm -f "$DCD_WORK_DIR/.idle_scan_enabled"` （停用扫描）
+  - **赚币里的 USDT 计入"待部署"**：活期可即时赎回，DCD 窗口一开就赎回投单，所以只要赚币 USDT >= 1000 就保持扫描开启（USDG 通常已让 flag 维持开启）
 - 报告 Phase 5 末尾用一句话注明本次 flag 操作（启用 / 停用 / 维持现状）
 
 > 物理实现：launchd 任务按固定 cron 触发，但 `run_8h_idle_scan.sh` 入口先检查 flag。flag 不存在 → 直接 exit 0 不调 Claude、不发 TG，等同于"暂停"。
@@ -189,10 +211,11 @@ echo '{"ts":"<ISO8601>","usdg_funding":<X>,"usdt_funding":<X>,"btc_balance":<X>,
 ## 🎯 Phase 3 本轮下单
 - PUT：<产品ID / 行权价 / APY / 安全距离 / 投入> 或「跳过，原因：...」
 - CALL：<tier=CLOSE|FAR / gap_pct / 产品ID / 行权价 / APY / 投入> 或「跳过，原因：...」
+- USDT 赚币：<赎回 X 投 DCD / 停泊 X 吃 1.55% / 维持 X 在赚币> 或「无操作」
 
 ## 📈 当前资产快照
-- USDG: X
-- USDT: X
+- USDG: X（资金账户）
+- USDT: X（资金账户）+ X（简单赚币）
 - BTC: X
 
 ## ⚠️ 关注事项
